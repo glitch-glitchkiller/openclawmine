@@ -1,10 +1,12 @@
 #!/bin/sh
-mkdir -p /home/node/.openclaw
-cat > /home/node/.openclaw/openclaw.json << 'EOF'
+# Write config to OPENCLAW_STATE_DIR (which the gateway reads) and also ~/.openclaw as fallback
+mkdir -p /data/.openclaw /home/node/.openclaw
+cat > /data/.openclaw/openclaw.json << 'EOF'
 {
   "gateway": {
-    "trustedProxies": ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+    "trustedProxies": ["*"]
   }
 }
 EOF
+cp /data/.openclaw/openclaw.json /home/node/.openclaw/openclaw.json
 exec node dist/index.js gateway --allow-unconfigured --bind lan --port 10000

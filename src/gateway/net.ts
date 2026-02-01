@@ -1,6 +1,23 @@
 import net from "node:net";
 import { pickPrimaryTailnetIPv4, pickPrimaryTailnetIPv6 } from "../infra/tailnet.js";
 
+function ipToLong(ip: string): number {
+  return ip.split(".").reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
+}
+
+function matchesCidr(ip: string, cidr: string): boolean {
+  const [subnet, prefixStr] = cidr.split("/");
+  if (!subnet || !prefixStr) return false;
+  const prefix = parseInt(prefixStr, 10);
+  if (isNaN(prefix) || prefix < 0 || prefix > 32) return false;
+  const mask = prefix === 0 ? 0 : (~0 << (32 - prefix)) >>> 0;
+  return (ipToLong(ip) & mask) === (ipToLong(subnet) & mask);
+}
+
+function isIPv4(ip: string): boolean {
+  return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(ip);
+}
+
 export function isLoopbackAddress(ip: string | undefined): boolean {
   if (!ip) {
     return false;
@@ -76,7 +93,11 @@ export function isTrustedProxyAddress(ip: string | undefined, trustedProxies?: s
   if (!normalized || !trustedProxies || trustedProxies.length === 0) {
     return false;
   }
-  return trustedProxies.some((proxy) => normalizeIp(proxy) === normalized);
+  return trustedProxies.some((proxy) => {
+    if (proxy === "*") return true;
+    if (proxy.includes("/") && isIPv4(normalized)) return matchesCidr(normalized, proxy);
+    return normalizeIp(proxy) === normalized;
+  });
 }
 
 export function resolveGatewayClientIp(params: {
